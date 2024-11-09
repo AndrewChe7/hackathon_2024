@@ -1,0 +1,59 @@
+services:
+  frontend:
+    environment:
+      - VITE_API_URL
+    container_name: front
+    build:  ./front
+    command: sh -c "cd /usr/src/front && npm i && npm run dev"
+    volumes:
+      - ./front:/usr/src/front
+    ports:
+      - "5173:5173"
+
+
+  backend:
+    build: 
+      context: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./back:/back
+
+    command:
+      sh -c 'python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000'
+
+
+  redis:
+    image: redis:latest
+    hostname: redis
+
+
+  worker:
+    build: 
+      context: .
+    hostname: worker
+    entrypoint: celery
+    command: -A back worker --loglevel=info -B
+    
+    volumes:
+      - ./back:/back
+    
+    links:
+      - redis
+    depends_on:
+      - redis
+
+  flower:
+    build: 
+      context: .
+    hostname: flower
+    entrypoint: celery
+    command: -A back flower
+    volumes:
+        - ./back:/back
+    links:
+        - redis
+    depends_on:
+      - redis
+    ports:
+      - "5555:5555"
